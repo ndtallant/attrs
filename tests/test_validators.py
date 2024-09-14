@@ -621,6 +621,28 @@ class TestDeepIterable:
 
         assert expected_repr == repr(v)
 
+    def test_member_validator_error_messages(self, member_validator):
+        """"""
+        validator = deep_iterable(
+            iterable_validator=instance_of(list),
+            member_validator=member_validator,
+            validate_all_members_before_failing=True
+        )
+        a = simple_attr("test")
+        with pytest.raises(
+            ExceptionGroup,
+            match=f"Attribute '{a.name}' had members fail "
+        ):
+            validator(None, a, [43, "42"])
+
+        validator = deep_iterable(
+            iterable_validator=instance_of(list),
+            member_validator=member_validator,
+        )
+        a = simple_attr("test")
+        with pytest.raises(TypeError):
+            validator(None, a, [43, "42"])
+
 
 class TestDeepMapping:
     """

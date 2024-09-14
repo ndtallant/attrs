@@ -333,6 +333,9 @@ class _DeepIterable:
     iterable_validator = attrib(
         default=None, validator=optional(is_callable())
     )
+    validate_all_members_before_failing = attrib(
+        default=False, validator=instance_of(bool)
+    )
 
     def __call__(self, inst, attr, value):
         """
@@ -341,8 +344,25 @@ class _DeepIterable:
         if self.iterable_validator is not None:
             self.iterable_validator(inst, attr, value)
 
-        for member in value:
-            self.member_validator(inst, attr, member)
+        if not self.validate_all_members_before_failing:
+            for member in value:
+                self.member_validator(inst, attr, member)
+
+        else:
+            member_exceptions = []
+            for idx, member in enumerate(value):
+                try:
+                    self.member_validator(inst, attr, member)
+                except Exception as ex:
+                    # Can only do this in python 3.11?
+                    ex.add_note(f"Failed member validation at index {idx}")
+                    member_exceptions.append(ex)
+            if member_exceptions:
+                raise ExceptionGroup(
+                    f"Attribute '{attr.name}' had members fail {self.member_validator!r}: ",
+                    member_exceptions
+                )
+                
 
     def __repr__(self):
         iterable_identifier = (
@@ -356,7 +376,11 @@ class _DeepIterable:
         )
 
 
-def deep_iterable(member_validator, iterable_validator=None):
+def deep_iterable(
+    member_validator, 
+    iterable_validator=None,
+    validate_all_members_before_failing=False,
+):
     """
     A validator that performs deep validation of an iterable.
 
@@ -366,14 +390,27 @@ def deep_iterable(member_validator, iterable_validator=None):
         iterable_validator:
             Validator to apply to iterable itself (optional).
 
+        validate_all_members_before_failing:
+            If False, this validator will raise the first 
+            error raised by member_validator. If True,
+            this validator will raise an ExceptionGroup
+            for all members that fail validation.
+
     Raises
-        TypeError: if any sub-validators fail
+        TypeError: 
+            if any sub-validators fail and validate_all_members_before_failing is False
+        ExceptionGroup:
+            if any sub-validators fail and validate_all_members_before_failing is True
 
     .. versionadded:: 19.1.0
     """
     if isinstance(member_validator, (list, tuple)):
         member_validator = and_(*member_validator)
-    return _DeepIterable(member_validator, iterable_validator)
+    return _DeepIterable(
+        member_validator, 
+        iterable_validator,
+        validate_all_members_before_failing
+    )
 
 
 @attrs(repr=False, slots=True, unsafe_hash=True)
