@@ -6,7 +6,6 @@ Commonly useful validators.
 
 import operator
 import re
-
 from contextlib import contextmanager
 from re import Pattern
 
@@ -15,9 +14,9 @@ from ._make import _AndValidator, and_, attrib, attrs
 from .converters import default_if_none
 from .exceptions import NotCallableError
 
-
 __all__ = [
     "and_",
+    "as_validator",
     "deep_iterable",
     "deep_mapping",
     "disabled",
@@ -171,9 +170,7 @@ def matches_re(regex, flags=0, func=None):
     valid_funcs = (re.fullmatch, None, re.search, re.match)
     if func not in valid_funcs:
         msg = "'func' must be one of {}.".format(
-            ", ".join(
-                sorted(e and e.__name__ or "None" for e in set(valid_funcs))
-            )
+            ", ".join(sorted(e and e.__name__ or "None" for e in set(valid_funcs)))
         )
         raise ValueError(msg)
 
@@ -297,13 +294,10 @@ class _IsCallableValidator:
         """
         if not callable(value):
             message = (
-                "'{name}' must be callable "
-                "(got {value!r} that is a {actual!r})."
+                "'{name}' must be callable " "(got {value!r} that is a {actual!r})."
             )
             raise NotCallableError(
-                msg=message.format(
-                    name=attr.name, value=value, actual=value.__class__
-                ),
+                msg=message.format(name=attr.name, value=value, actual=value.__class__),
                 value=value,
             )
 
@@ -327,12 +321,46 @@ def is_callable():
     return _IsCallableValidator()
 
 
+@attrs(repr=False, slots=False, unsafe_hash=True)
+class _AsValidatorValidator:
+
+    condition = attrib(validator=is_callable())
+
+    def __call__(self, inst, attr, value):
+        """
+        We use a callable class to be able to change the ``__repr__``.
+        """
+        if not self.condition(inst, attr, value):
+            raise ValueError(
+                f"Invalid value for {inst.__class__.__name__}.{attr.name}: {value!r}"
+            )
+
+    def __repr__(self):
+        return f"<as_validator wrapping callable {self.condition!r}>"
+
+
+def as_validator(condition):
+    """
+    A validator that raises a `ValueError` if the initializer
+    is called with a value that does not return a truthy
+    value when called with the given function.
+
+    Args:
+        condition: Validator to apply to dictionary keys.
+
+    .. versionadded:: 24.TODO
+
+    Raises:
+        ValueError:
+
+    """
+    return _AsValidatorValidator(condition)
+
+
 @attrs(repr=False, slots=True, unsafe_hash=True)
 class _DeepIterable:
     member_validator = attrib(validator=is_callable())
-    iterable_validator = attrib(
-        default=None, validator=optional(is_callable())
-    )
+    iterable_validator = attrib(default=None, validator=optional(is_callable()))
 
     def __call__(self, inst, attr, value):
         """
@@ -346,9 +374,7 @@ class _DeepIterable:
 
     def __repr__(self):
         iterable_identifier = (
-            ""
-            if self.iterable_validator is None
-            else f" {self.iterable_validator!r}"
+            "" if self.iterable_validator is None else f" {self.iterable_validator!r}"
         )
         return (
             f"<deep_iterable validator for{iterable_identifier}"
@@ -596,8 +622,7 @@ class _NotValidator:
     validator = attrib()
     msg = attrib(
         converter=default_if_none(
-            "not_ validator child '{validator!r}' "
-            "did not raise a captured error"
+            "not_ validator child '{validator!r}' " "did not raise a captured error"
         )
     )
     exc_types = attrib(

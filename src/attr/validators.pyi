@@ -12,8 +12,7 @@ from typing import (
     overload,
 )
 
-from attrs import _ValidatorType
-from attrs import _ValidatorArgType
+from attrs import _ValidatorArgType, _ValidatorType
 
 _T = TypeVar("_T")
 _T1 = TypeVar("_T1")
@@ -46,9 +45,7 @@ def instance_of(
 def instance_of(type: tuple[type, ...]) -> _ValidatorType[Any]: ...
 def optional(
     validator: (
-        _ValidatorType[_T]
-        | list[_ValidatorType[_T]]
-        | tuple[_ValidatorType[_T]]
+        _ValidatorType[_T] | list[_ValidatorType[_T]] | tuple[_ValidatorType[_T]]
     ),
 ) -> _ValidatorType[_T | None]: ...
 def in_(options: Container[_T]) -> _ValidatorType[_T]: ...
@@ -81,3 +78,4 @@ def not_(
     exc_types: type[Exception] | Iterable[type[Exception]] = ...,
 ) -> _ValidatorType[_T]: ...
 def or_(*validators: _ValidatorType[_T]) -> _ValidatorType[_T]: ...
+def as_validator(condition: _ValidatorType[_T]) -> _ValidatorType[_T]: ...

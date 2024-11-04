@@ -9,12 +9,12 @@ import re
 import pytest
 
 import attr
-
 from attr import _config, fields, has
 from attr import validators as validator_module
 from attr.validators import (
     _subclass_of,
     and_,
+    as_validator,
     deep_iterable,
     deep_mapping,
     ge,
@@ -50,9 +50,7 @@ class TestDisableValidators:
         """
         assert _config._run_validators is True
 
-    @pytest.mark.parametrize(
-        ("value", "expected"), [(True, False), (False, True)]
-    )
+    @pytest.mark.parametrize(("value", "expected"), [(True, False), (False, True)])
     def test_set_validators_disabled(self, value, expected):
         """
         Sets `_run_validators`.
@@ -61,9 +59,7 @@ class TestDisableValidators:
 
         assert _config._run_validators is expected
 
-    @pytest.mark.parametrize(
-        ("value", "expected"), [(True, False), (False, True)]
-    )
+    @pytest.mark.parametrize(("value", "expected"), [(True, False), (False, True)])
     def test_disabled(self, value, expected):
         """
         Returns `_run_validators`.
@@ -204,9 +200,7 @@ class TestMatchesRe:
         """
         pattern = re.compile("")
 
-        with pytest.raises(
-            TypeError, match="can only be used with a string pattern"
-        ):
+        with pytest.raises(TypeError, match="can only be used with a string pattern"):
             matches_re(pattern, flags=re.IGNORECASE)
 
     def test_different_func(self):
@@ -228,8 +222,7 @@ class TestMatchesRe:
             matches_re("a", 0, lambda: None)
 
         assert (
-            "'func' must be one of None, fullmatch, match, search."
-            == ei.value.args[0]
+            "'func' must be one of None, fullmatch, match, search." == ei.value.args[0]
         )
 
     @pytest.mark.parametrize(
@@ -245,9 +238,7 @@ class TestMatchesRe:
         """
         __repr__ is meaningful.
         """
-        assert repr(matches_re("a")).startswith(
-            "<matches_re validator for pattern"
-        )
+        assert repr(matches_re("a")).startswith("<matches_re validator for pattern")
 
 
 def always_pass(_, __, ___):
@@ -505,18 +496,14 @@ class TestDeepIterable:
             ([42, instance_of(int)], 42),
         ],
     )
-    def test_noncallable_validators(
-        self, member_validator, iterable_validator
-    ):
+    def test_noncallable_validators(self, member_validator, iterable_validator):
         """
         Raise `TypeError` if any validators are not callable.
         """
         with pytest.raises(TypeError) as e:
             deep_iterable(member_validator, iterable_validator)
         value = 42
-        message = (
-            f"must be callable (got {value} that is a {value.__class__})."
-        )
+        message = f"must be callable (got {value} that is a {value.__class__})."
 
         assert message in e.value.args[0]
         assert value == e.value.args[1]
@@ -562,9 +549,7 @@ class TestDeepIterable:
         member_validator = instance_of(int)
         member_repr = "<instance_of validator for type <class 'int'>>"
         v = deep_iterable(member_validator)
-        expected_repr = (
-            f"<deep_iterable validator for iterables of {member_repr}>"
-        )
+        expected_repr = f"<deep_iterable validator for iterables of {member_repr}>"
         assert expected_repr == repr(v)
 
     def test_repr_member_only_sequence(self):
@@ -579,9 +564,7 @@ class TestDeepIterable:
             "<instance_of validator for type <class 'int'>>))"
         )
         v = deep_iterable(member_validator)
-        expected_repr = (
-            f"<deep_iterable validator for iterables of {member_repr}>"
-        )
+        expected_repr = f"<deep_iterable validator for iterables of {member_repr}>"
         assert expected_repr == repr(v)
 
     def test_repr_member_and_iterable(self):
@@ -663,9 +646,7 @@ class TestDeepMapping:
             deep_mapping(key_validator, value_validator, mapping_validator)
 
         value = 42
-        message = (
-            f"must be callable (got {value} that is a {value.__class__})."
-        )
+        message = f"must be callable (got {value} that is a {value.__class__})."
 
         assert message in e.value.args[0]
         assert value == e.value.args[1]
@@ -800,9 +781,7 @@ class TestLtLeGeGt:
         """
         validator is in ``__all__``.
         """
-        assert all(
-            f.__name__ in validator_module.__all__ for f in [lt, le, ge, gt]
-        )
+        assert all(f.__name__ in validator_module.__all__ for f in [lt, le, ge, gt])
 
     @pytest.mark.parametrize("v", [lt, le, ge, gt])
     def test_retrieve_bound(self, v):
@@ -1074,8 +1053,7 @@ class TestNot_:
         v = not_(wrapped)
 
         assert (
-            f"<not_ validator wrapping {wrapped!r}, "
-            f"capturing {v.exc_types!r}>"
+            f"<not_ validator wrapping {wrapped!r}, " f"capturing {v.exc_types!r}>"
         ) == repr(v)
 
     def test_success_because_fails(self):
@@ -1140,9 +1118,9 @@ class TestNot_:
             v(None, a, input_value)
 
         assert (
-            (
-                "not_ validator child '{!r}' did not raise a captured error"
-            ).format(in_("abc")),
+            ("not_ validator child '{!r}' did not raise a captured error").format(
+                in_("abc")
+            ),
             a,
             wrapped,
             input_value,
@@ -1172,9 +1150,7 @@ class TestNot_:
             v(None, a, input_value)
 
         assert (
-            (
-                f"not_ validator child '{wrapped!r}' did not raise a captured error"
-            ),
+            (f"not_ validator child '{wrapped!r}' did not raise a captured error"),
             a,
             wrapped,
             input_value,
@@ -1312,3 +1288,43 @@ class TestOr:
             "<or validator wrapping (<instance_of validator for type "
             "<class 'int'>>, <instance_of validator for type <class 'str'>>)>"
         ) == repr(v)
+
+
+class TestAsValidator:
+
+    def test_in_all(self):
+        """
+        Verify that this validator is in ``__all__``.
+        """
+        assert as_validator.__name__ in validator_module.__all__
+
+    def test_success(self):
+        """
+        Succeeds if at least one of wrapped validators succeed.
+        """
+        v = as_validator(lambda _, __, ___: True)
+
+        v(None, simple_attr("test"), 42)
+
+    def test_fail(self):
+        """
+        Fails if all wrapped validators fail.
+        """
+        v = as_validator(always_fail)
+
+        with pytest.raises(ZeroDivisionError):
+            v(None, simple_attr("test"), 42)
+
+    def test_repr(self):
+        """
+        Returned validator has a useful `__repr__`.
+        """
+
+        def this_will_be_in_repr(_, __, ___):
+            """Test condition function."""
+            return
+
+        v = as_validator(this_will_be_in_repr)
+        assert (
+            "<as_validator wrapping callable <function TestAsValidator.test_repr.<locals>.this_will_be_in_repr"
+        ) in repr(v)
