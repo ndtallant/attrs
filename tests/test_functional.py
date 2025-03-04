@@ -6,16 +6,13 @@ End-to-end tests.
 
 import inspect
 import pickle
-
 from copy import deepcopy
 
 import pytest
-
 from hypothesis import given
 from hypothesis.strategies import booleans
 
 import attr
-
 from attr._make import NOTHING, Attribute
 from attr.exceptions import FrozenInstanceError
 
@@ -150,6 +147,26 @@ class TestFunctional:
         `attr.asdict` works.
         """
         assert {"x": 1, "y": 2} == attr.asdict(cls(x=1, y=2))
+
+    @pytest.mark.parametrize("cls", [C1, C1Slots])
+    def test_astuple(self, cls):
+        """
+        `attr.astuple` works.
+        """
+        assert (1, 2) == attr.astuple(cls(x=1, y=2))
+
+    def test_astuple_recursive(self):
+        """
+        `attr.astuple` works recursively.
+        """
+
+        @attr.s
+        class RecurseExample:
+            x: int = attr.ib()
+            r: "RecurseExample" = attr.ib()
+
+        example = RecurseExample(1, RecurseExample(2, RecurseExample(3, None)))
+        assert (1, (2, (3, None))) == attr.astuple(example)
 
     @pytest.mark.parametrize("cls", [C1, C1Slots])
     def test_validator(self, cls):
@@ -388,9 +405,7 @@ class TestFunctional:
         class HashByIDBackwardCompat:
             x = attr.ib()
 
-        assert hash(HashByIDBackwardCompat(1)) != hash(
-            HashByIDBackwardCompat(1)
-        )
+        assert hash(HashByIDBackwardCompat(1)) != hash(HashByIDBackwardCompat(1))
 
         @attr.s(unsafe_hash=False, eq=False)
         class HashByID:
@@ -511,9 +526,7 @@ class TestFunctional:
         class Base:
             a = attr.ib(converter=int if base_converter else None)
 
-        @attr.s(
-            frozen=sub_frozen, slots=sub_slots, weakref_slot=sub_weakref_slot
-        )
+        @attr.s(frozen=sub_frozen, slots=sub_slots, weakref_slot=sub_weakref_slot)
         class Sub(Base):
             b = attr.ib(converter=int if sub_converter else None)
 

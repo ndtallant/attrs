@@ -204,6 +204,81 @@ def _asdict_anything(
     return rv
 
 
+def _astuple(
+    inst,
+    recurse=True,
+    filter=None,
+    tuple_factory=tuple,
+    retain_collection_types=False,
+):
+    attrs = fields(inst.__class__)
+    retain = retain_collection_types  # Very long. :/
+    for a in attrs:
+        v = getattr(inst, a.name)
+        if filter is not None and not filter(a, v):
+            continue
+        if not recurse:
+            yield v
+            continue
+        if has(v.__class__):
+            yield from astuple(
+                v,
+                recurse=True,
+                filter=filter,
+                tuple_factory=tuple_factory,
+                retain_collection_types=retain,
+            )
+        elif isinstance(v, (tuple, list, set, frozenset)):
+            cf = v.__class__ if retain is True else list
+            items = [
+                (
+                    astuple(
+                        j,
+                        recurse=True,
+                        filter=filter,
+                        tuple_factory=tuple_factory,
+                        retain_collection_types=retain,
+                    )
+                    if has(j.__class__)
+                    else j
+                )
+                for j in v
+            ]
+            try:
+                yield cf(items)
+            except TypeError:
+                if not issubclass(cf, tuple):
+                    raise
+                # Workaround for TypeError: cf.__new__() missing 1 required
+                # positional argument (which appears, for a namedturle)
+                yield cf(*items)
+        elif isinstance(v, dict):
+            df = v.__class__ if retain is True else dict
+            yield df(
+                (
+                    (
+                        astuple(
+                            kk,
+                            tuple_factory=tuple_factory,
+                            retain_collection_types=retain,
+                        )
+                        if has(kk.__class__)
+                        else kk
+                    ),
+                    (
+                        astuple(
+                            vv,
+                            tuple_factory=tuple_factory,
+                            retain_collection_types=retain,
+                        )
+                        if has(vv.__class__)
+                        else vv
+                    ),
+                )
+                for kk, vv in v.items()
+            )
+
+
 def astuple(
     inst,
     recurse=True,
@@ -246,81 +321,15 @@ def astuple(
 
     ..  versionadded:: 16.2.0
     """
-    attrs = fields(inst.__class__)
-    rv = []
-    retain = retain_collection_types  # Very long. :/
-    for a in attrs:
-        v = getattr(inst, a.name)
-        if filter is not None and not filter(a, v):
-            continue
-        if recurse is True:
-            if has(v.__class__):
-                rv.append(
-                    astuple(
-                        v,
-                        recurse=True,
-                        filter=filter,
-                        tuple_factory=tuple_factory,
-                        retain_collection_types=retain,
-                    )
-                )
-            elif isinstance(v, (tuple, list, set, frozenset)):
-                cf = v.__class__ if retain is True else list
-                items = [
-                    (
-                        astuple(
-                            j,
-                            recurse=True,
-                            filter=filter,
-                            tuple_factory=tuple_factory,
-                            retain_collection_types=retain,
-                        )
-                        if has(j.__class__)
-                        else j
-                    )
-                    for j in v
-                ]
-                try:
-                    rv.append(cf(items))
-                except TypeError:
-                    if not issubclass(cf, tuple):
-                        raise
-                    # Workaround for TypeError: cf.__new__() missing 1 required
-                    # positional argument (which appears, for a namedturle)
-                    rv.append(cf(*items))
-            elif isinstance(v, dict):
-                df = v.__class__ if retain is True else dict
-                rv.append(
-                    df(
-                        (
-                            (
-                                astuple(
-                                    kk,
-                                    tuple_factory=tuple_factory,
-                                    retain_collection_types=retain,
-                                )
-                                if has(kk.__class__)
-                                else kk
-                            ),
-                            (
-                                astuple(
-                                    vv,
-                                    tuple_factory=tuple_factory,
-                                    retain_collection_types=retain,
-                                )
-                                if has(vv.__class__)
-                                else vv
-                            ),
-                        )
-                        for kk, vv in v.items()
-                    )
-                )
-            else:
-                rv.append(v)
-        else:
-            rv.append(v)
-
-    return rv if tuple_factory is list else tuple_factory(rv)
+    return tuple_factory(
+        _astuple(
+            inst,
+            recurse=True,
+            filter=None,
+            tuple_factory=tuple,
+            retain_collection_types=False,
+        )
+    )
 
 
 def has(cls):
@@ -430,9 +439,7 @@ def evolve(*args, **changes):
     try:
         (inst,) = args
     except ValueError:
-        msg = (
-            f"evolve() takes 1 positional argument, but {len(args)} were given"
-        )
+        msg = f"evolve() takes 1 positional argument, but {len(args)} were given"
         raise TypeError(msg) from None
 
     cls = inst.__class__
@@ -448,9 +455,7 @@ def evolve(*args, **changes):
     return cls(**changes)
 
 
-def resolve_types(
-    cls, globalns=None, localns=None, attribs=None, include_extras=True
-):
+def resolve_types(cls, globalns=None, localns=None, attribs=None, include_extras=True):
     """
     Resolve any strings and forward annotations in type annotations.
 
